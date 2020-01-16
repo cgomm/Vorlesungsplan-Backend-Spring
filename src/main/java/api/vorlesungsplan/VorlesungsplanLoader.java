@@ -1,10 +1,13 @@
-package service.vorlesungsplan;
+package api.vorlesungsplan;
 
-import controller.JsoupNetworkController;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Attributes;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Autowired;
+import api.repository.CourseListRepository;
+import api.model.CourseModel;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,49 +20,46 @@ public class VorlesungsplanLoader {
     private Map courseMap = new HashMap();
     private List courseView = new ArrayList();
 
-    public VorlesungsplanLoader() {
-        this.courseMap = loadCourses();
-    }
-
-    public VorlesungsplanLoader(String search) {
-        this.courseView = searchCourses(search);
-    }
+    @Autowired
+    CourseListRepository courseListRepository;
 
     public Map loadCourses() {
         Document doc;
         try {
             doc = Jsoup.connect(this.VORLESUNGSPLAN_ICAL_URL).get();
             Elements courseJSON = doc.select("#class_select");
-            String courseTinf18 = doc.select("option[value=7431001]").text();
+            //String courseTinf18 = doc.select("option[value=7431001]").text();
             for(Element element: courseJSON) {
                 System.out.println(element.attr("optgroup"));
             }
-            System.out.println(courseTinf18);
+            //System.out.println(courseTinf18);
         } catch (IOException e) {
             e.printStackTrace();
         }
         return courseMap;
     }
 
-    public static List searchCourses(String searchterm) {
-        List searchlist = new ArrayList();
+    public Map courseListRequest() {
+        Map searchlist = new HashMap();
 
         try {
             Document doc = Jsoup.connect(VORLESUNGSPLAN_ICAL_URL).get();
-            Elements courseList = doc.select("option[label*=" + searchterm + "]");
-            /*for(Element element: courseList) {
-                searchlist.add(element.select("option[label*=" + searchterm + "]").text());
-            }*/
-            searchlist = courseList.eachText();
-            searchlist.stream().distinct().filter(courseName -> courseName.equals("")).close();
+            Elements courseList = doc.select("option");
+            courseList.remove(0);
+            for(Element element: courseList) {
+                Attributes attributes = element.attributes();
+                searchlist.putAll(attributes.dataset());
+                searchlist.put(attributes.get("label"), attributes.get("value"));
+
+                CourseModel course = new CourseModel();
+                course.setCourseName(attributes.get("label"));
+                course.setCourseValue(attributes.get("value"));
+
+                courseListRepository.save(course);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
         return searchlist;
-        //return String.join(", ", searchlist);
-    }
-
-    public List getCourseView() {
-        return courseView;
     }
 }
